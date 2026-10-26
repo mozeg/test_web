@@ -1,12 +1,238 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Fashionista العراق | ساعات فاخرة</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Discord Token Extractor</title>
+    <style>
+        :root {
+            --bg-main: #313338;
+            --bg-box: #1e1f22;
+            --bg-input: #111214;
+            --text-main: #dbdee1;
+            --text-muted: #949ba4;
+            --accent: #5865f2;
+            --accent-hover: #4752c4;
+            --error: #fa777c;
+        }
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 15px;
+            box-sizing: border-box;
+        }
+        .container {
+            background-color: var(--bg-box);
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+            width: 100%;
+            max-width: 400px;
+        }
+        h2 {
+            color: #f2f3f5;
+            text-align: center;
+            margin-top: 0;
+            margin-bottom: 20px;
+            font-size: 22px;
+        }
+        .input-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 13px;
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+        input {
+            width: 100%;
+            padding: 12px;
+            background-color: var(--bg-input);
+            border: 1px solid #222428;
+            border-radius: 6px;
+            color: var(--text-main);
+            box-sizing: border-box;
+            font-size: 15px;
+            transition: border-color 0.2s;
+        }
+        input:focus {
+            border-color: var(--accent);
+            outline: none;
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            background-color: var(--accent);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            font-weight: bold;
+            margin-top: 10px;
+            transition: background-color 0.2s;
+        }
+        button:hover {
+            background-color: var(--accent-hover);
+        }
+        #result-container {
+            margin-top: 20px;
+            display: none;
+        }
+        textarea {
+            width: 100%;
+            height: 90px;
+            background-color: var(--bg-input);
+            border: 1px solid #222428;
+            color: #00ffcc;
+            padding: 10px;
+            border-radius: 6px;
+            resize: none;
+            box-sizing: border-box;
+            font-family: monospace;
+            font-size: 13px;
+        }
+        .message {
+            text-align: center;
+            margin-top: 12px;
+            font-size: 14px;
+            word-break: break-word;
+        }
+        .error { color: var(--error); }
+        .info { color: #f0b232; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h2>استخراج توكن ديسكورد</h2>
+        <div class="input-group">
+            <label>البريد الإلكتروني أو الهاتف</label>
+            <input type="text" id="email" placeholder="example@email.com">
+        </div>
+        <div class="input-group">
+            <label>كلمة المرور</label>
+            <input type="password" id="password" placeholder="••••••••••••">
+        </div>
+        
+        <!-- حقل إضافي يظهر تلقائياً إذا طلب الحساب رمز التحقق 2FA -->
+        <div class="input-group" id="code-group" style="display: none;">
+            <label id="code-label">رمز التحقق بخطوتين (2FA)</label>
+            <input type="text" id="mfa-code" placeholder="أدخل الرمز المكون من 6 أرقام">
+        </div>
+
+        <button id="submit-btn" onclick="handleLogin()">استخراج التوكن</button>
+        
+        <div id="msg" class="message"></div>
+
+        <div id="result-container">
+            <label>التوكن الخاص بك (اضغط للنسخ):</label>
+            <textarea id="token-output" readonly onclick="copyToken()"></textarea>
+            <div style="font-size: 11px; color: var(--text-muted); text-align: center; margin-top: 5px;">تم النسخ للحافظة بنجاح</div>
+        </div>
+    </div>
+
+    <script>
+        let ticketData = null; // لتخزين بيانات المصادقة الثنائية إن وجدت
+
+        async function handleLogin() {
+            const email = document.getElementById('email').value.trim();
+            const password = document.getElementById('password').value.trim();
+            const mfaCode = document.getElementById('mfa-code').value.trim();
+            const msgDiv = document.getElementById('msg');
+            const resultContainer = document.getElementById('result-container');
+            const tokenOutput = document.getElementById('token-output');
+            const codeGroup = document.getElementById('code-group');
+
+            msgDiv.textContent = "";
+            msgDiv.className = "message";
+            resultContainer.style.display = "none";
+
+            if (!email || !password) {
+                msgDiv.textContent = "الرجاء إدخال البريد الإلكتروني وكلمة المرور.";
+                msgDiv.className = "message error";
+                return;
+            }
+
+            try {
+                let bodyData = {
+                    login: email,
+                    password: password,
+                    undelete: false,
+                    captcha_key: null,
+                    login_source: null,
+                    gift_code_sku_id: null
+                };
+
+                // إذا كان الحساب يطلب كود 2FA وتم إدخاله
+                if (ticketData && mfaCode) {
+                    bodyData = {
+                        code: mfaCode,
+                        ticket: ticketData
+                    };
+                }
+
+                const endpoint = (ticketData && mfaCode) ? 'https://discord.com/api/v9/auth/mfa/totp' : 'https://discord.com/api/v9/auth/login';
+
+                msgDiv.textContent = "جاري الاتصال بسيرفرات ديسكورد...";
+                msgDiv.className = "message info";
+
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(bodyData)
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    if (data.token) {
+                        tokenOutput.value = data.token;
+                        resultContainer.style.display = "block";
+                        msgDiv.textContent = "تم استخراج التوكن بنجاح!";
+                        msgDiv.className = "message";
+                        codeGroup.style.display = "none";
+                    } else if (data.mfa) {
+                        // الحساب يتطلب التحقق بخطوتين
+                        ticketData = data.ticket;
+                        codeGroup.style.display = "block";
+                        msgDiv.textContent = "الحساب محمي بالتحقق بخطوتين (2FA). الرجاء إدخال الكود أعلاه.";
+                        msgDiv.className = "message info";
+                    }
+                } else {
+                    if (data.captcha_key) {
+                        msgDiv.textContent = "عذراً، يطلب ديسكورد تجاوز اختبار (Captcha). لا يمكن إكماله من هذه الواجهة.";
+                    } else if (data.password) {
+                        msgDiv.textContent = "كلمة المرور غير صحيحة.";
+                    } else if (data.login) {
+                        msgDiv.textContent = "البريد الإلكتروني غير صحيح.";
+                    } else {
+                        msgDiv.textContent = data.message || "فشل تسجيل الدخول. تحقق من البيانات.";
+                    }
+                    msgDiv.className = "message error";
+                }
+            } catch (err) {
+                msgDiv.textContent = "خطأ في الاتصال. (قد يتم حظر الطلب بسبب سياسات CORS الخاصة بالمتصفح).";
+                msgDiv.className = "message error";
+                console.error(err);
+            }
+        }
+
+        function copyToken() {
+            const tokenOutput = document.getElementById('token-output');
+            tokenOutput.select();
+            navigator.clipboard.writeText(tokenOutput.value);
+        }
+    </script>
+</body>
 </html>
